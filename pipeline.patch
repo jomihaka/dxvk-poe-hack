@@ -1,188 +1,64 @@
-diff --git a/README.md b/README.md
-index 6523a24..4b781a7 100644
---- a/README.md
-+++ b/README.md
-@@ -85,6 +85,7 @@ The following environment variables can be used for **debugging** purposes.
- - `DXVK_LOG_LEVEL=none|error|warn|info|debug` Controls message logging
- - `DXVK_FAKE_DX10_SUPPORT=1` Advertizes support for D3D10 interfaces
- - `DXVK_USE_PIPECOMPILER=1` Enable asynchronous pipeline compilation. This currently only has an effect on RADV in mesa-git.
-+- `DXVK_USE_PLACEHOLDER_SHADERS=1` Use placeholder discard shaders while real shaders are compiling. Needs asynchronous pipeline compilation. **Will lead to graphical glitches**.
- 
- ## Troubleshooting
- DXVK requires threading support from your mingw-w64 build environment. If you
 diff --git a/src/dxvk/dxvk_graphics.cpp b/src/dxvk/dxvk_graphics.cpp
-index 844f676..2a6cab8 100644
+index 8bd99f2..4cf945b 100644
 --- a/src/dxvk/dxvk_graphics.cpp
 +++ b/src/dxvk/dxvk_graphics.cpp
-@@ -89,6 +89,14 @@ namespace dxvk {
-     
-     m_common.msSampleShadingEnable = fs != nullptr && fs->hasCapability(spv::CapabilitySampleRateShading);
-     m_common.msSampleShadingFactor = 1.0f;
-+
-+    DxvkShader* vert;
-+    DxvkShader* frag;
-+    getPlaceholderShaders(vert, frag);
-+    if (m_vs != nullptr)
-+      m_vs_placeholder = vert ? vert->createShaderModule(m_vkd, slotMapping) : m_vs;
-+    if (m_fs != nullptr)
-+      m_fs_placeholder = frag ? frag->createShaderModule(m_vkd, slotMapping) : m_fs;
-   }
-   
-   
-@@ -193,7 +201,7 @@ namespace dxvk {
-           VkPipelineCreateFlags          createFlags,
-           VkPipeline                     baseHandle) const {
-     if (Logger::logLevel() <= LogLevel::Debug) {
--      Logger::debug("Compiling graphics pipeline...");
-+      Logger::debug(str::format("Compiling graphics pipeline (", createFlags, ")..."));
-       this->logPipelineState(LogLevel::Debug, state);
-     }
-     
-@@ -218,11 +226,21 @@ namespace dxvk {
-     
-     std::vector<VkPipelineShaderStageCreateInfo> stages;
-     
--    if (m_vs  != nullptr) stages.push_back(m_vs->stageInfo(&specInfo));
-+    DxvkShaderModule* vert;
-+    DxvkShaderModule* frag;
-+    if (createFlags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT) {
-+        vert = m_vs_placeholder.ptr();
-+        frag = m_fs_placeholder.ptr();
-+    } else {
-+        vert = m_vs.ptr();
-+        frag = m_fs.ptr();
+@@ -124,9 +124,12 @@ namespace dxvk {
+     // If no pipeline instance exists with the given state
+     // vector, create a new one and add it to the list.
+     VkPipeline newPipelineBase   = m_basePipelineBase.load();
+-    VkPipeline newPipelineHandle = this->compilePipeline(state, renderPassHandle,
+-      m_compiler != nullptr ? VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT : 0,
+-      newPipelineBase);
++    VkPipeline newPipelineHandle = VK_NULL_HANDLE;
++    if (!m_device->config().useAsyncPipeCompiler || !m_device->config().dontWaitForShaders) {
++      newPipelineHandle = this->compilePipeline(state, renderPassHandle,
++        m_compiler != nullptr ? VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT : 0,
++        newPipelineBase);
 +    }
-+
-+    if (vert  != nullptr) stages.push_back(vert->stageInfo(&specInfo));
-     if (m_tcs != nullptr) stages.push_back(m_tcs->stageInfo(&specInfo));
-     if (m_tes != nullptr) stages.push_back(m_tes->stageInfo(&specInfo));
-     if (m_gs  != nullptr) stages.push_back(m_gs->stageInfo(&specInfo));
--    if (m_fs  != nullptr) stages.push_back(m_fs->stageInfo(&specInfo));
-+    if (frag  != nullptr) stages.push_back(frag->stageInfo(&specInfo));
      
-     std::array<VkVertexInputBindingDivisorDescriptionEXT, MaxNumVertexBindings> viDivisorDesc;
-     uint32_t                                                                    viDivisorCount = 0;
-@@ -380,7 +398,7 @@ namespace dxvk {
-     
-     auto t1 = std::chrono::high_resolution_clock::now();
-     auto td = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
--    Logger::debug(str::format("DxvkGraphicsPipeline: Finished in ", td.count(), " ms"));
-+    Logger::debug(str::format("DxvkGraphicsPipeline (", createFlags, "): Finished in ", td.count(), " ms"));
-     return pipeline;
+     Rc<DxvkGraphicsPipelineInstance> newPipeline =
+       new DxvkGraphicsPipelineInstance(m_device->vkd(), state,
+diff --git a/src/dxvk/dxvk_options.cpp b/src/dxvk/dxvk_options.cpp
+index 5c39dda..e8c6acb 100644
+--- a/src/dxvk/dxvk_options.cpp
++++ b/src/dxvk/dxvk_options.cpp
+@@ -5,6 +5,7 @@ namespace dxvk {
+   DxvkOptions::DxvkOptions(const Config& config) {
+     allowMemoryOvercommit = config.getOption<bool>("dxvk.allowMemoryOvercommit", false);
+     useAsyncPipeCompiler  = config.getOption<bool>("dxvk.useAsyncPipeCompiler",  false);
++    dontWaitForShaders    = config.getOption<bool>("dxvk.dontWaitForShaders",    false);
    }
-   
-@@ -419,4 +437,4 @@ namespace dxvk {
-     // TODO log more pipeline state
-   }
-   
--}
-\ No newline at end of file
-+}
-diff --git a/src/dxvk/dxvk_graphics.h b/src/dxvk/dxvk_graphics.h
-index ad1de14..faedc35 100644
---- a/src/dxvk/dxvk_graphics.h
-+++ b/src/dxvk/dxvk_graphics.h
-@@ -243,6 +243,8 @@ namespace dxvk {
-     Rc<DxvkShaderModule>  m_tes;
-     Rc<DxvkShaderModule>  m_gs;
-     Rc<DxvkShaderModule>  m_fs;
-+    Rc<DxvkShaderModule>  m_vs_placeholder;
-+    Rc<DxvkShaderModule>  m_fs_placeholder;
-     
-     uint32_t m_vsIn  = 0;
-     uint32_t m_fsOut = 0;
-diff --git a/src/dxvk/dxvk_shader.cpp b/src/dxvk/dxvk_shader.cpp
-index a838955..701e320 100644
---- a/src/dxvk/dxvk_shader.cpp
-+++ b/src/dxvk/dxvk_shader.cpp
-@@ -1,7 +1,27 @@
- #include "dxvk_shader.h"
-+#include "vs_placeholder.h"
-+#include "fs_placeholder.h"
  
- namespace dxvk {
-   
-+  void getPlaceholderShaders(DxvkShader*& vert, DxvkShader*& frag) {
-+    static bool init;
-+    static DxvkShader* vs;
-+    static DxvkShader* fs;
-+
-+    if (!init) {
-+      if (env::getEnvVar(L"DXVK_USE_PIPECOMPILER") == "1" && env::getEnvVar(L"DXVK_USE_PLACEHOLDER_SHADERS") == "1") {
-+        vs = new DxvkShader(VK_SHADER_STAGE_VERTEX_BIT  , 0, nullptr, {1,1}, SpirvCodeBuffer(vs_placeholder));
-+        fs = new DxvkShader(VK_SHADER_STAGE_FRAGMENT_BIT, 0, nullptr, {1,1}, SpirvCodeBuffer(fs_placeholder));
-+        Logger::debug("Using placeholder shaders");
-+      }
-+      init = true;
-+    }
-+
-+    vert = vs;
-+    frag = fs;
-+  }
-+
-   DxvkShaderModule::DxvkShaderModule(
-     const Rc<vk::DeviceFn>&     vkd,
-     const Rc<DxvkShader>&       shader,
-@@ -110,4 +130,4 @@ namespace dxvk {
-     m_code = SpirvCodeBuffer(inputStream);
-   }
-   
--}
+ }
 \ No newline at end of file
-+}
-diff --git a/src/dxvk/dxvk_shader.h b/src/dxvk/dxvk_shader.h
-index 0aa092d..4ab3c31 100644
---- a/src/dxvk/dxvk_shader.h
-+++ b/src/dxvk/dxvk_shader.h
-@@ -214,4 +214,6 @@ namespace dxvk {
-     
+diff --git a/src/dxvk/dxvk_options.h b/src/dxvk/dxvk_options.h
+index 23471c0..0491326 100644
+--- a/src/dxvk/dxvk_options.h
++++ b/src/dxvk/dxvk_options.h
+@@ -13,6 +13,10 @@ namespace dxvk {
+ 
+     /// Enable asynchronous pipeline compilation.
+     bool useAsyncPipeCompiler;
++
++    /// Don't wait for initial shader compilation if using async compiler.
++    /// This leads to incorrect rendering.
++    bool dontWaitForShaders;
    };
-   
--}
-\ No newline at end of file
-+  void getPlaceholderShaders(DxvkShader*& vert, DxvkShader*& frag);
-+
-+}
-diff --git a/src/dxvk/meson.build b/src/dxvk/meson.build
-index 3c21bb1..c700f17 100644
---- a/src/dxvk/meson.build
-+++ b/src/dxvk/meson.build
-@@ -21,6 +21,9 @@ dxvk_shaders = files([
-   'hud/shaders/hud_line.frag',
-   'hud/shaders/hud_text.frag',
-   'hud/shaders/hud_vert.vert',
-+
-+  'placeholders/vs_placeholder.vert',
-+  'placeholders/fs_placeholder.frag',
- ])
  
- dxvk_src = files([
-@@ -93,4 +96,4 @@ dxvk_lib = static_library('dxvk', dxvk_src, glsl_generator.process(dxvk_shaders)
- 
- dxvk_dep = declare_dependency(
-   link_with           : [ dxvk_lib ],
--  include_directories : [ dxvk_include_path, include_directories('.') ])
+ }
 \ No newline at end of file
-+  include_directories : [ dxvk_include_path, include_directories('.') ])
-diff --git a/src/dxvk/placeholders/fs_placeholder.frag b/src/dxvk/placeholders/fs_placeholder.frag
-new file mode 100644
-index 0000000..ec2af5d
---- /dev/null
-+++ b/src/dxvk/placeholders/fs_placeholder.frag
-@@ -0,0 +1,5 @@
-+#version 450
-+
-+void main() {
-+  discard;
-+}
-diff --git a/src/dxvk/placeholders/vs_placeholder.vert b/src/dxvk/placeholders/vs_placeholder.vert
-new file mode 100644
-index 0000000..b0619c8
---- /dev/null
-+++ b/src/dxvk/placeholders/vs_placeholder.vert
-@@ -0,0 +1,5 @@
-+#version 450
-+
-+void main() {
-+  gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-+}
+diff --git a/src/util/config/config.cpp b/src/util/config/config.cpp
+index 20927db..5a1dafc 100644
+--- a/src/util/config/config.cpp
++++ b/src/util/config/config.cpp
+@@ -39,6 +39,10 @@ namespace dxvk {
+     { "Overwatch.exe", {{
+       { "d3d11.fakeStreamOutSupport",       "True" },
+     }} },
++    { "PathOfExile_x64.exe", {{
++      { "dxvk.useAsyncPipeCompiler",        "True" },
++      { "dxvk.dontWaitForShaders",          "True" },
++    }} },
+   }};
+ 
+ 
