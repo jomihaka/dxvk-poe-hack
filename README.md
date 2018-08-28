@@ -9,4 +9,4 @@ Enabled by default for Path of Exile.
 ### Instructions
 
 * Patch dxvk with pipeline.patch
-* If trying it for other games, set dxvk.useAsyncPipeCompiler and dxvk.dontWaitForShaders to true in config
+* If trying it for other games, set dxvk.useAsyncPipeCompiler and dxvk.dontWaitForShaders to true in [config](https://github.com/doitsujin/dxvk/wiki/Configuration)
