@@ -4,7 +4,7 @@ A hack for dxvk to not stall the rendering thread when compiling shaders. This "
 Enabled by default for Path of Exile.
 
 ### Games tested
-* Path of Exile: seems fine
+* Path of Exile: seems fine. Atlas may be buggy first, but toggling display mode (e.g. fullscreen to windowed fullscreen and back) or running a map should fix it.
 
 ### Instructions
 
