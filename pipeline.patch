@@ -1,63 +1,28 @@
-diff --git a/src/dxvk/dxvk_graphics.cpp b/src/dxvk/dxvk_graphics.cpp
-index 8bd99f2..4cf945b 100644
---- a/src/dxvk/dxvk_graphics.cpp
-+++ b/src/dxvk/dxvk_graphics.cpp
-@@ -124,9 +124,12 @@ namespace dxvk {
-     // If no pipeline instance exists with the given state
-     // vector, create a new one and add it to the list.
-     VkPipeline newPipelineBase   = m_basePipelineBase.load();
--    VkPipeline newPipelineHandle = this->compilePipeline(state, renderPassHandle,
--      m_compiler != nullptr ? VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT : 0,
--      newPipelineBase);
-+    VkPipeline newPipelineHandle = VK_NULL_HANDLE;
-+    if (!m_device->config().useAsyncPipeCompiler || !m_device->config().dontWaitForShaders) {
-+      newPipelineHandle = this->compilePipeline(state, renderPassHandle,
-+        m_compiler != nullptr ? VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT : 0,
-+        newPipelineBase);
-+    }
-     
-     Rc<DxvkGraphicsPipelineInstance> newPipeline =
-       new DxvkGraphicsPipelineInstance(m_device->vkd(), state,
 diff --git a/src/dxvk/dxvk_options.cpp b/src/dxvk/dxvk_options.cpp
-index 5c39dda..e8c6acb 100644
+index 2a9f91e..06e9142 100644
 --- a/src/dxvk/dxvk_options.cpp
 +++ b/src/dxvk/dxvk_options.cpp
-@@ -5,6 +5,7 @@ namespace dxvk {
+@@ -4,7 +4,7 @@ namespace dxvk {
+ 
    DxvkOptions::DxvkOptions(const Config& config) {
      allowMemoryOvercommit = config.getOption<bool>("dxvk.allowMemoryOvercommit", false);
-     useAsyncPipeCompiler  = config.getOption<bool>("dxvk.useAsyncPipeCompiler",  false);
-+    dontWaitForShaders    = config.getOption<bool>("dxvk.dontWaitForShaders",    false);
+-    asyncPipeCompiler     = false; // config.getOption<bool>("dxvk.asyncPipeCompiler",     false);
++    asyncPipeCompiler     = config.getOption<bool>("dxvk.asyncPipeCompiler",     false);
    }
  
  }
 \ No newline at end of file
-diff --git a/src/dxvk/dxvk_options.h b/src/dxvk/dxvk_options.h
-index 23471c0..0491326 100644
---- a/src/dxvk/dxvk_options.h
-+++ b/src/dxvk/dxvk_options.h
-@@ -13,6 +13,10 @@ namespace dxvk {
- 
-     /// Enable asynchronous pipeline compilation.
-     bool useAsyncPipeCompiler;
-+
-+    /// Don't wait for initial shader compilation if using async compiler.
-+    /// This leads to incorrect rendering.
-+    bool dontWaitForShaders;
-   };
- 
- }
-\ No newline at end of file
 diff --git a/src/util/config/config.cpp b/src/util/config/config.cpp
-index 20927db..5a1dafc 100644
+index 9bbda32..73dcd72 100644
 --- a/src/util/config/config.cpp
 +++ b/src/util/config/config.cpp
-@@ -39,6 +39,10 @@ namespace dxvk {
+@@ -58,6 +58,10 @@ namespace dxvk {
      { "Overwatch.exe", {{
        { "d3d11.fakeStreamOutSupport",       "True" },
      }} },
++    /* Path of Exile                              */
 +    { "PathOfExile_x64.exe", {{
-+      { "dxvk.useAsyncPipeCompiler",        "True" },
-+      { "dxvk.dontWaitForShaders",          "True" },
++      { "dxvk.asyncPipeCompiler",           "True" },
 +    }} },
    }};
  
