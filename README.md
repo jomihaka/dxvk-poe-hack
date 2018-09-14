@@ -1,5 +1,7 @@
 # What?
-Dxvk has now disabled the async shader compilation, since using it has reportedly resulted in a ban. This patch restores it again.
+Dxvk has now removed the async shader compilation, since using it has reportedly resulted in a ban. This patch restores it again.
+
+Enabled for Path of Exile by default.
 
 ### Games tested
 Note: may result in a ban in some games
