@@ -92,15 +92,15 @@ index 2eb0f08..724a8be 100644
      
      void updateIndexBufferBinding();
      void updateVertexBufferBindings();
-@@ -763,6 +763,8 @@ namespace dxvk {
+@@ -762,6 +762,8 @@ namespace dxvk {
+     
      void commitComputeInitBarriers();
      void commitComputePostBarriers();
- 
++
 +    bool checkAsyncCompilationCompat();
-+    
-     Rc<DxvkBuffer> getTransferBuffer(VkDeviceSize size);
      
    };
+   
 diff --git a/src/dxvk/dxvk_graphics.cpp b/src/dxvk/dxvk_graphics.cpp
 index 2b25114..28b670d 100644
 --- a/src/dxvk/dxvk_graphics.cpp
