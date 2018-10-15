@@ -407,7 +407,7 @@ index 51e7140..06e9142 100644
  
    DxvkOptions::DxvkOptions(const Config& config) {
      allowMemoryOvercommit = config.getOption<bool>("dxvk.allowMemoryOvercommit", false);
-+    asyncPipeCompiler     = config.getOption<bool>("dxvk.asyncPipeCompiler",     false);
++    asyncPipeCompiler     = config.getOption<bool>("dxvk.asyncPipeCompiler",     true);
    }
  
  }
