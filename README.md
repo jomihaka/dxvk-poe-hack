@@ -4,9 +4,9 @@ Dxvk has now removed the async shader compilation, since using it has reportedly
 Enabled for Path of Exile by default.
 
 ### Games tested
-Note: may result in a ban in some games
+WARNING: use only at your discretion
 
-* Path of Exile: seems fine. Atlas may be buggy first, but toggling display mode (e.g. fullscreen to windowed fullscreen and back) or running a map should fix it.
+* Path of Exile: seems fine
 
 ### Instructions
 
