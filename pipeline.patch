@@ -12,7 +12,7 @@ index fe0038a..029f904 100644
    output: 'version.h')
  
 diff --git a/src/dxvk/dxvk_context.cpp b/src/dxvk/dxvk_context.cpp
-index 1e6bfc4..c15e198 100644
+index 1e6bfc4..5a3722b 100644
 --- a/src/dxvk/dxvk_context.cpp
 +++ b/src/dxvk/dxvk_context.cpp
 @@ -417,7 +417,7 @@ namespace dxvk {
@@ -78,7 +78,7 @@ index 1e6bfc4..c15e198 100644
    
 +
 +  bool DxvkContext::checkAsyncCompilationCompat() {
-+    bool fbCompat = m_device->config().asyncPipeCompiler;
++    bool fbCompat = true;
 +    for (uint32_t i = 0; fbCompat && i < m_state.om.framebuffer->numAttachments(); i++) {
 +      const auto& attachment = m_state.om.framebuffer->getAttachment(i);
 +      fbCompat &= attachment.view->getRtBindingAsyncCompilationCompat();
@@ -110,7 +110,7 @@ index 374eec3..0efbf54 100644
              VkPipelineStageFlags      srcStages,
              VkAccessFlags             srcAccess,
 diff --git a/src/dxvk/dxvk_graphics.cpp b/src/dxvk/dxvk_graphics.cpp
-index 86b476b..6687c3d 100644
+index 86b476b..b9508b6 100644
 --- a/src/dxvk/dxvk_graphics.cpp
 +++ b/src/dxvk/dxvk_graphics.cpp
 @@ -4,6 +4,7 @@
@@ -153,10 +153,10 @@ index 86b476b..6687c3d 100644
 +        new DxvkGraphicsPipelineInstance(m_pipeMgr->m_device->vkd(),
 +          state, renderPassHandle, VK_NULL_HANDLE);
 +
-+      if (!async)
-+        newPipelineHandle = this->compileInstance(newPipeline, renderPass.format());
-+      else
++      if (async && m_pipeMgr->m_compiler != nullptr)
 +        m_pipeMgr->m_compiler->queueCompilation(this, newPipeline, renderPass.format());
++      else
++        newPipelineHandle = this->compileInstance(newPipeline, renderPass.format());
  
        // Add new pipeline to the set
 -      m_pipelines.emplace_back(state, renderPassHandle, newPipelineHandle);
@@ -399,34 +399,6 @@ index 3207ce8..69f26ab 100644
      void createView(VkImageViewType type, uint32_t numLayers);
      
    };
-diff --git a/src/dxvk/dxvk_options.cpp b/src/dxvk/dxvk_options.cpp
-index 51e7140..06e9142 100644
---- a/src/dxvk/dxvk_options.cpp
-+++ b/src/dxvk/dxvk_options.cpp
-@@ -4,6 +4,7 @@ namespace dxvk {
- 
-   DxvkOptions::DxvkOptions(const Config& config) {
-     allowMemoryOvercommit = config.getOption<bool>("dxvk.allowMemoryOvercommit", false);
-+    asyncPipeCompiler     = config.getOption<bool>("dxvk.asyncPipeCompiler",     false);
-   }
- 
- }
-\ No newline at end of file
-diff --git a/src/dxvk/dxvk_options.h b/src/dxvk/dxvk_options.h
-index 2547234..0fc560e 100644
---- a/src/dxvk/dxvk_options.h
-+++ b/src/dxvk/dxvk_options.h
-@@ -10,6 +10,9 @@ namespace dxvk {
-     /// Allow allocating more memory from
-     /// a heap than the device supports.
-     bool allowMemoryOvercommit;
-+
-+    /// Enable asynchronous pipeline compilation.
-+    bool asyncPipeCompiler;
-   };
- 
- }
-\ No newline at end of file
 diff --git a/src/dxvk/dxvk_pipecompiler.cpp b/src/dxvk/dxvk_pipecompiler.cpp
 new file mode 100644
 index 0000000..e62721a
@@ -568,22 +540,19 @@ index 0000000..0833f2b
 +
 +}
 diff --git a/src/dxvk/dxvk_pipemanager.cpp b/src/dxvk/dxvk_pipemanager.cpp
-index 1e27b8e..d568aa0 100644
+index 1e27b8e..78d5200 100644
 --- a/src/dxvk/dxvk_pipemanager.cpp
 +++ b/src/dxvk/dxvk_pipemanager.cpp
-@@ -43,11 +43,15 @@ namespace dxvk {
-     const DxvkDevice*         device,
-           DxvkRenderPassPool* passManager)
+@@ -45,9 +45,13 @@ namespace dxvk {
    : m_device    (device),
--    m_cache     (new DxvkPipelineCache(device->vkd())) {
-+    m_cache     (new DxvkPipelineCache(device->vkd())),
-+    m_compiler  (nullptr) {
+     m_cache     (new DxvkPipelineCache(device->vkd())) {
      std::string useStateCache = env::getEnvVar(L"DXVK_STATE_CACHE");
++    std::string useAsync      = env::getEnvVar(L"DXVK_ASYNC");
      
      if (useStateCache != "0")
        m_stateCache = new DxvkStateCache(this, passManager);
 +
-+    if (m_device->config().asyncPipeCompiler)
++    if (useAsync == "1")
 +      m_compiler = new DxvkPipelineCompiler();
    }
    
@@ -633,18 +602,3 @@ index 0dc911a..5cf992a 100644
    'dxvk_pipelayout.cpp',
    'dxvk_pipemanager.cpp',
    'dxvk_query.cpp',
-diff --git a/src/util/config/config.cpp b/src/util/config/config.cpp
-index 99c4cb7..f8157cc 100644
---- a/src/util/config/config.cpp
-+++ b/src/util/config/config.cpp
-@@ -66,6 +66,10 @@ namespace dxvk {
-     { "Overwatch.exe", {{
-       { "d3d11.fakeStreamOutSupport",       "True" },
-     }} },
-+    /* Path of Exile                              */
-+    { "PathOfExile_x64.exe", {{
-+      { "dxvk.asyncPipeCompiler",           "True" },
-+    }} },
-     /* Star Citizen                               */
-     { "StarCitizen.exe", {{
-       { "dxgi.customVendorId",              "1002" },

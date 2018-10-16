@@ -1,15 +1,19 @@
-# What?
-Dxvk has now removed the async shader compilation, since using it has reportedly resulted in a ban. This patch restores it again.
+# WARNING: use only at your discretion. 
+While this has nothing to do with cheating, you may be banned from online games if anti-cheat systems doesn't like it.
+The repository's name contains the word 'hack' only because the author didn't think of its association to cheating.
 
-Enabled for Path of Exile by default.
+## What?
+Originally started as hacky solution for shader compilation stutter in dxvk. Similar solution was later added to dxvk itself and promptly
+removed. This patch restores it again.
+
+Not enabled by default
 
 ### Games tested
-WARNING: use only at your discretion
 
 * Path of Exile: seems fine
 
 ### Instructions
 
 * Patch dxvk with pipeline.patch
-* If trying it for other games, set dxvk.asyncPipeCompiler = True in [config](https://github.com/doitsujin/dxvk/wiki/Configuration)
+* Set environment variable `DXVK_ASYNC=1`
 
