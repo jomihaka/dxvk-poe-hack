@@ -12,7 +12,7 @@ Not enabled by default
 
 ### Games tested
 
-* Path of Exile: seems fine
+* Path of Exile: seems fine. Disabling state cache (`DXVK_STATE_CACHE=0`) is recommended, though.
 
 ### Instructions
 
