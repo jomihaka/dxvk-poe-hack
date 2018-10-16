@@ -1,4 +1,6 @@
-# WARNING: use only at your discretion. 
+# WARNING
+Use only at your discretion.
+
 While this has nothing to do with cheating, you may be banned from online games if anti-cheat systems doesn't like it.
 The repository's name contains the word 'hack' only because the author didn't think of its association to cheating.
 
