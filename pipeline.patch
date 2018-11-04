@@ -1,8 +1,8 @@
 diff --git a/meson.build b/meson.build
-index fe0038a..029f904 100644
+index bf12810..5ca8ad4 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -56,7 +56,7 @@ glsl_generator = generator(glsl_compiler,
+@@ -64,7 +64,7 @@ glsl_generator = generator(glsl_compiler,
    arguments : [ '-V', '--vn', '@BASENAME@', '@INPUT@', '-o', '@OUTPUT@' ])
  
  dxvk_version = vcs_tag(
@@ -12,10 +12,10 @@ index fe0038a..029f904 100644
    output: 'version.h')
  
 diff --git a/src/dxvk/dxvk_context.cpp b/src/dxvk/dxvk_context.cpp
-index 1e6bfc4..5a3722b 100644
+index ec67176..15b50fd 100644
 --- a/src/dxvk/dxvk_context.cpp
 +++ b/src/dxvk/dxvk_context.cpp
-@@ -417,7 +417,7 @@ namespace dxvk {
+@@ -427,7 +427,7 @@ namespace dxvk {
      const Rc<DxvkImageView>&    imageView,
            VkImageAspectFlags    clearAspects,
      const VkClearValue&         clearValue) {
@@ -24,7 +24,7 @@ index 1e6bfc4..5a3722b 100644
  
      // Prepare attachment ops
      DxvkColorAttachmentOps colorOp;
-@@ -1544,7 +1544,7 @@ namespace dxvk {
+@@ -1556,7 +1556,7 @@ namespace dxvk {
            VkOffset3D            offset,
            VkExtent3D            extent,
            VkClearValue          value) {
@@ -33,7 +33,7 @@ index 1e6bfc4..5a3722b 100644
  
      // Find out if the render target view is currently bound,
      // so that we can avoid spilling the render pass if it is.
-@@ -2426,7 +2426,7 @@ namespace dxvk {
+@@ -2423,7 +2423,7 @@ namespace dxvk {
        
        m_gpActivePipeline = m_state.gp.pipeline != nullptr && m_state.om.framebuffer != nullptr
          ? m_state.gp.pipeline->getPipelineHandle(m_state.gp.state,
@@ -42,7 +42,7 @@ index 1e6bfc4..5a3722b 100644
          : VK_NULL_HANDLE;
        
        if (m_gpActivePipeline != VK_NULL_HANDLE) {
-@@ -2673,7 +2673,7 @@ namespace dxvk {
+@@ -2678,7 +2678,7 @@ namespace dxvk {
    }
    
    
@@ -51,7 +51,7 @@ index 1e6bfc4..5a3722b 100644
      if (m_flags.test(DxvkContextFlag::GpDirtyFramebuffer)) {
        m_flags.clr(DxvkContextFlag::GpDirtyFramebuffer);
        
-@@ -2692,6 +2692,11 @@ namespace dxvk {
+@@ -2697,6 +2697,11 @@ namespace dxvk {
            : VkComponentMapping();
        }
  
@@ -63,16 +63,16 @@ index 1e6bfc4..5a3722b 100644
        m_flags.set(DxvkContextFlag::GpDirtyPipelineState);
      }
    }
-@@ -2883,7 +2888,7 @@ namespace dxvk {
-   
+@@ -2899,7 +2904,7 @@ namespace dxvk {
    
    void DxvkContext::commitGraphicsState() {
--    this->updateFramebuffer();
-+    this->updateFramebuffer(true);
-     this->startRenderPass();
-     this->updateGraphicsPipeline();
-     this->updateIndexBufferBinding();
-@@ -3037,4 +3042,13 @@ namespace dxvk {
+     if (m_flags.test(DxvkContextFlag::GpDirtyFramebuffer))
+-      this->updateFramebuffer();
++      this->updateFramebuffer(true);
+ 
+     if (!m_flags.test(DxvkContextFlag::GpRenderPassBound))
+       this->startRenderPass();
+@@ -3098,4 +3103,13 @@ namespace dxvk {
      }
    }
    
@@ -88,10 +88,10 @@ index 1e6bfc4..5a3722b 100644
  }
 \ No newline at end of file
 diff --git a/src/dxvk/dxvk_context.h b/src/dxvk/dxvk_context.h
-index 374eec3..0efbf54 100644
+index 01e0d14..deb5516 100644
 --- a/src/dxvk/dxvk_context.h
 +++ b/src/dxvk/dxvk_context.h
-@@ -831,7 +831,7 @@ namespace dxvk {
+@@ -839,7 +839,7 @@ namespace dxvk {
              VkDescriptorSet         set,
        const DxvkPipelineLayout*     layout);
  
@@ -100,9 +100,9 @@ index 374eec3..0efbf54 100644
      
      void updateIndexBufferBinding();
      void updateVertexBufferBindings();
-@@ -850,6 +850,8 @@ namespace dxvk {
-     void commitComputeInitBarriers();
-     void commitComputePostBarriers();
+@@ -860,6 +860,8 @@ namespace dxvk {
+     
+     void commitGraphicsPostBarriers();
  
 +    bool checkAsyncCompilationCompat();
 +
@@ -110,7 +110,7 @@ index 374eec3..0efbf54 100644
              VkPipelineStageFlags      srcStages,
              VkAccessFlags             srcAccess,
 diff --git a/src/dxvk/dxvk_graphics.cpp b/src/dxvk/dxvk_graphics.cpp
-index 86b476b..b9508b6 100644
+index 9dee8cf..9f3f1f6 100644
 --- a/src/dxvk/dxvk_graphics.cpp
 +++ b/src/dxvk/dxvk_graphics.cpp
 @@ -4,6 +4,7 @@
@@ -121,7 +121,7 @@ index 86b476b..b9508b6 100644
  #include "dxvk_spec_const.h"
  #include "dxvk_state_cache.h"
  
-@@ -79,8 +80,6 @@ namespace dxvk {
+@@ -87,8 +88,6 @@ namespace dxvk {
    
    
    DxvkGraphicsPipeline::~DxvkGraphicsPipeline() {
@@ -130,7 +130,7 @@ index 86b476b..b9508b6 100644
    }
    
    
-@@ -105,10 +104,10 @@ namespace dxvk {
+@@ -113,7 +112,8 @@ namespace dxvk {
  
    VkPipeline DxvkGraphicsPipeline::getPipelineHandle(
      const DxvkGraphicsPipelineStateInfo& state,
@@ -139,16 +139,12 @@ index 86b476b..b9508b6 100644
 +          bool                           async) {
      VkRenderPass renderPassHandle = renderPass.getDefaultHandle();
      
--    VkPipeline newPipelineBase   = VK_NULL_HANDLE;
      VkPipeline newPipelineHandle = VK_NULL_HANDLE;
- 
-     { std::lock_guard<sync::Spinlock> lock(m_mutex);
-@@ -125,31 +124,50 @@ namespace dxvk {
+@@ -132,29 +132,49 @@ namespace dxvk {
        
        // If no pipeline instance exists with the given state
        // vector, create a new one and add it to the list.
--      newPipelineBase   = m_basePipeline.load();
--      newPipelineHandle = this->compilePipeline(state, renderPassHandle, newPipelineBase);
+-      newPipelineHandle = this->compilePipeline(state, renderPassHandle, m_basePipeline);
 +      Rc<DxvkGraphicsPipelineInstance> newPipeline =
 +        new DxvkGraphicsPipelineInstance(m_pipeMgr->m_device->vkd(),
 +          state, renderPassHandle, VK_NULL_HANDLE);
@@ -162,15 +158,9 @@ index 86b476b..b9508b6 100644
 -      m_pipelines.emplace_back(state, renderPassHandle, newPipelineHandle);
 +      m_pipelines.push_back(newPipeline);
        m_pipeMgr->m_numGraphicsPipelines += 1;
-     }
-     
--    // Use the new pipeline as the base pipeline for derivative pipelines
--    if (newPipelineBase == VK_NULL_HANDLE && newPipelineHandle != VK_NULL_HANDLE)
--      m_basePipeline.compare_exchange_strong(newPipelineBase, newPipelineHandle);
--    
--    if (newPipelineHandle != VK_NULL_HANDLE)
--      this->writePipelineStateToCache(state, renderPass.format());
--    
+-      
++    }
++    
 +    return newPipelineHandle;
 +  }
 +
@@ -178,18 +168,21 @@ index 86b476b..b9508b6 100644
 +  VkPipeline DxvkGraphicsPipeline::compileInstance(
 +    const Rc<DxvkGraphicsPipelineInstance>& instance,
 +    const DxvkRenderPassFormat&             format) {
-+    VkPipeline newPipelineBase   = m_basePipeline.load();
 +    VkPipeline newPipelineHandle = this->compilePipeline(
-+      instance->m_stateVector, instance->m_renderPass, newPipelineBase);
++      instance->m_stateVector, instance->m_renderPass, m_basePipeline);
 +
 +    if (!instance->setPipeline(newPipelineHandle)) {
 +      m_vkd->vkDestroyPipeline(m_vkd->device(), newPipelineHandle, nullptr);
 +    } else {
-+      if (newPipelineBase == VK_NULL_HANDLE && newPipelineHandle != VK_NULL_HANDLE)
-+        m_basePipeline.compare_exchange_strong(newPipelineBase, newPipelineHandle);
+       if (!m_basePipeline && newPipelineHandle)
+         m_basePipeline = newPipelineHandle;
 +      if (newPipelineHandle != VK_NULL_HANDLE)
 +        this->writePipelineStateToCache(instance->m_stateVector, format);
-+    }
+     }
+-    
+-    if (newPipelineHandle != VK_NULL_HANDLE)
+-      this->writePipelineStateToCache(state, renderPass.format());
+-    
 +
      return newPipelineHandle;
    }
@@ -207,7 +200,7 @@ index 86b476b..b9508b6 100644
      }
      
      return nullptr;
-@@ -392,11 +410,6 @@ namespace dxvk {
+@@ -397,11 +417,6 @@ namespace dxvk {
    }
    
    
@@ -220,10 +213,10 @@ index 86b476b..b9508b6 100644
      const DxvkGraphicsPipelineStateInfo& state) const {
      // Validate vertex input - each input slot consumed by the
 diff --git a/src/dxvk/dxvk_graphics.h b/src/dxvk/dxvk_graphics.h
-index c02d572..90d30a0 100644
+index f0d7d9a..a92e6a6 100644
 --- a/src/dxvk/dxvk_graphics.h
 +++ b/src/dxvk/dxvk_graphics.h
-@@ -102,19 +102,25 @@ namespace dxvk {
+@@ -104,19 +104,25 @@ namespace dxvk {
     * Stores a state vector and the
     * corresponding pipeline handle.
     */
@@ -252,7 +245,7 @@ index c02d572..90d30a0 100644
      /**
       * \brief Checks for matching pipeline state
       * 
-@@ -129,23 +135,38 @@ namespace dxvk {
+@@ -131,23 +137,38 @@ namespace dxvk {
            && m_renderPass  == rp;
      }
  
@@ -293,7 +286,7 @@ index c02d572..90d30a0 100644
    /**
     * \brief Graphics pipeline
     * 
-@@ -204,20 +225,20 @@ namespace dxvk {
+@@ -206,20 +227,20 @@ namespace dxvk {
       * state. If necessary, a new pipeline will be created.
       * \param [in] state Pipeline state vector
       * \param [in] renderPass The render pass
@@ -321,7 +314,7 @@ index c02d572..90d30a0 100644
      Rc<vk::DeviceFn>        m_vkd;
      DxvkPipelineManager*    m_pipeMgr;
  
-@@ -235,13 +256,13 @@ namespace dxvk {
+@@ -237,13 +258,13 @@ namespace dxvk {
      DxvkGraphicsCommonPipelineStateInfo m_common;
      
      // List of pipeline instances, shared between threads
@@ -331,14 +324,14 @@ index c02d572..90d30a0 100644
 +    std::vector<Rc<DxvkGraphicsPipelineInstance>> m_pipelines;
      
      // Pipeline handles used for derivative pipelines
-     std::atomic<VkPipeline> m_basePipeline = { VK_NULL_HANDLE };
+     VkPipeline m_basePipeline = VK_NULL_HANDLE;
      
 -    const DxvkGraphicsPipelineInstance* findInstance(
 +    DxvkGraphicsPipelineInstance* findInstance(
        const DxvkGraphicsPipelineStateInfo& state,
              VkRenderPass                   renderPass) const;
      
-@@ -250,9 +271,6 @@ namespace dxvk {
+@@ -252,9 +273,6 @@ namespace dxvk {
              VkRenderPass                   renderPass,
              VkPipeline                     baseHandle) const;
      
@@ -578,10 +571,10 @@ index e6356fa..05199aa 100644
      std::atomic<uint32_t>     m_numComputePipelines  = { 0 };
      std::atomic<uint32_t>     m_numGraphicsPipelines = { 0 };
 diff --git a/src/dxvk/dxvk_state_cache.cpp b/src/dxvk/dxvk_state_cache.cpp
-index 3984b9f..19052fd 100644
+index 0d83989..659d7a7 100644
 --- a/src/dxvk/dxvk_state_cache.cpp
 +++ b/src/dxvk/dxvk_state_cache.cpp
-@@ -244,7 +244,7 @@ namespace dxvk {
+@@ -234,7 +234,7 @@ namespace dxvk {
          const auto& entry = m_entries[e->second];
  
          auto rp = m_passManager->getRenderPass(entry.format);
@@ -591,7 +584,7 @@ index 3984b9f..19052fd 100644
      } else {
        auto pipeline = m_pipeManager->createComputePipeline(item.cs);
 diff --git a/src/dxvk/meson.build b/src/dxvk/meson.build
-index 0dc911a..5cf992a 100644
+index a25900d..34e873b 100644
 --- a/src/dxvk/meson.build
 +++ b/src/dxvk/meson.build
 @@ -67,6 +67,7 @@ dxvk_src = files([
