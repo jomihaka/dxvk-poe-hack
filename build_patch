@@ -1,0 +1,5 @@
+#!/bin/sh
+
+container="dxvk-poe-hack"
+docker build -t "$container" .
+docker run --rm --entrypoint /bin/sh -v "$PWD/output:/host" "$container" -c "cp -R /output/* /host/"
