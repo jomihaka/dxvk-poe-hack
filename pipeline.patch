@@ -445,7 +445,7 @@ index 0000000..e62721a
 +
 +
 +  void DxvkPipelineCompiler::runCompilerThread() {
-+    env::setThreadName(L"dxvk-pcompiler");
++    env::setThreadName("dxvk-pcompiler");
 +
 +    while (!m_compilerStop.load()) {
 +      PipelineEntry entry;
