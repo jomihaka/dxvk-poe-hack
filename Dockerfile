@@ -13,7 +13,7 @@ RUN apt-get update \
 	gpg-agent
 
 RUN dpkg --add-architecture i386 \
-    && wget -O- https://dl.winehq.org/wine-builds/winehq.key | apt-key add -\ 
+    && wget -O- https://dl.winehq.org/wine-builds/winehq.key | apt-key add -\
     && apt-add-repository -y 'deb https://dl.winehq.org/wine-builds/ubuntu/ bionic main' \
     && apt-get install -y --install-recommends winehq-staging \
     && wine --version
@@ -33,12 +33,6 @@ RUN echo 1 | update-alternatives --config x86_64-w64-mingw32-gcc \
     && echo 1 | update-alternatives --config i686-w64-mingw32-g++
 
 COPY pipeline.patch ./pipeline.patch
+COPY entrypoint.sh ./entrypoint.sh
 
-ENV DXVK_VERSION=v0.94
-RUN git clone https://github.com/doitsujin/dxvk \
-    && cd dxvk \
-    && git checkout "$DXVK_VERSION" \
-    && git apply /root/pipeline.patch \
-    && ./package-release.sh "$DXVK_VERSION" /output --no-package
-
-
+ENTRYPOINT ["/root/entrypoint.sh"]
