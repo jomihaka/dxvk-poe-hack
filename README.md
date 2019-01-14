@@ -19,3 +19,10 @@ Not enabled by default
 * Patch dxvk with pipeline.patch
 * Set environment variable `DXVK_ASYNC=1`
 
+### Docker instructions
+
+* Clone the repository
+* cd into it
+* Build image with `docker build . -t image_name`
+* Run container with `docker run -it -v $(pwd)/dxvk_output:/output image_name v0.95`. Replace v0.95 with desired release.
+* Binaries will be available in dxvk_output directory. They will have root ownership. Change it to your user using `sudo chown your_user:your_user_group dxvk_output -R`
