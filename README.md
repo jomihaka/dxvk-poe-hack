@@ -1,3 +1,7 @@
+# Unmaintained
+I don't use this for anything currently, so you are on your own. Sorry!
+
+
 # WARNING
 Use only at your discretion.
 
